@@ -1,3 +1,6 @@
+# Publish packages.d/* onto GitHub Latest so pacman can use:
+#   Server = https://github.com/RishiSpace/enigmars-extras/releases/latest/download
+# Ubuntu runners have no makepkg/repo-add; the Arch container does.
 name: extras-repo
 
 on:
@@ -28,7 +31,11 @@ jobs:
             archlinux:latest \
             bash -lc '
               set -euo pipefail
-              pacman -Syu --noconfirm --needed base-devel git
+              pacman-key --init
+              pacman-key --populate archlinux
+              # fakeroot+binutils is enough for PKGBUILD.local (no compile).
+              # base-devel pulls gcc and made this job download ~160MiB.
+              pacman -Sy --noconfirm --needed archlinux-keyring fakeroot git binutils
               useradd -m -u 1001 builder
               chown -R builder:builder /extras
               su -s /bin/bash builder -c "./scripts/build-all.sh"

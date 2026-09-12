@@ -34,7 +34,7 @@ resolve_src() {
   fi
   if [[ -n "$giturl" ]]; then
     local dest="$REPO_ROOT/work/$name"
-    info "SRC missing ($src); cloning $giturl"
+    info "No local checkout at $src; cloning $giturl"
     rm -rf "$dest"
     mkdir -p "$(dirname "$dest")"
     git clone --depth 1 "$giturl" "$dest"

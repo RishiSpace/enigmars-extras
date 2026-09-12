@@ -26,7 +26,8 @@ die() {
 }
 
 info() {
-  printf '==> %s\n' "$*"
+  # stderr so command substitutions (resolve_src, etc.) only capture paths
+  printf '==> %s\n' "$*" >&2
 }
 
 need_cmd() {
