@@ -1,0 +1,45 @@
+name: extras-repo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: extras-repo-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout extras
+        uses: actions/checkout@v4
+
+      - name: Build packages in Arch
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD":/extras \
+            -w /extras \
+            archlinux:latest \
+            bash -lc '
+              set -euo pipefail
+              pacman -Syu --noconfirm --needed base-devel git
+              useradd -m -u 1001 builder
+              chown -R builder:builder /extras
+              su -s /bin/bash builder -c "./scripts/build-all.sh"
+            '
+
+      - name: Publish Latest release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u)":"$(id -g)" repo/x86_64
+          chmod +x scripts/upload-release-mirror.sh
+          ENIGMARS_EXTRAS_GITHUB="${GITHUB_REPOSITORY}" ./scripts/upload-release-mirror.sh

@@ -1,0 +1,21 @@
+# Built pacman repo (upload these to GitHub Releases, do not commit)
+/repo/x86_64/*.pkg.tar.zst
+/repo/x86_64/*.pkg.tar
+/repo/x86_64/*.db
+/repo/x86_64/*.db.tar.gz
+/repo/x86_64/*.files
+/repo/x86_64/*.files.tar.gz
+/repo/x86_64/*.old
+/repo/x86_64/SHA256SUMS
+
+# Clones when SRC is missing locally
+/work/
+
+# makepkg leftovers if someone builds in-tree
+/pkg/
+/src/
+*.log
+*~
+.DS_Store
+.idea/
+.vscode/
