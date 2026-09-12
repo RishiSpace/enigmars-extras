@@ -60,7 +60,10 @@ build_one() {
   (
     cd "$pbdir"
     # --nodeps: extras only packages files; ISO/host already has runtime deps.
-    makepkg -f --noconfirm --nodeps -p "$PKGBUILD"
+    # --config: force !debug so CI does not need debugedit.
+    makepkg -f --noconfirm --nodeps \
+      --config "$REPO_ROOT/scripts/makepkg.conf" \
+      -p "$PKGBUILD"
   )
 
   shopt -s nullglob
