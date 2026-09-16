@@ -34,6 +34,11 @@ assets=(
   "$DEST/${DB_NAME}.files.tar.gz"
   "$DEST/SHA256SUMS"
 )
+# Bookkeeping for CI polling: lets scheduled runs skip rebuilds when
+# upstream package repos have not moved. Optional; ignored if missing.
+if [[ -f "$DEST/UPSTREAM_SHAS" ]]; then
+  assets+=("$DEST/UPSTREAM_SHAS")
+fi
 for p in "$DEST"/*.pkg.tar.zst; do
   [[ "$(basename "$p")" == *-debug-* ]] && continue
   assets+=("$p")

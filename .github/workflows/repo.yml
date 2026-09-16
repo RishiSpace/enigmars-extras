@@ -1,12 +1,52 @@
 # Publish packages.d/* onto GitHub Latest so pacman can use:
 #   Server = https://github.com/RishiSpace/enigmars-extras/releases/latest/download
 # Ubuntu runners have no makepkg/repo-add; the Arch container does.
+#
+# How this stays up to date with the individual package repos
+# (e.g. enigmars-utils, app-track, anything else added to packages.d/):
+#
+# 1. Polling (works with zero extra setup): the `schedule` trigger below
+#    runs hourly, resolves HEAD of every GIT= URL in packages.d/*.conf via
+#    `git ls-remote`, and skips the rebuild when nothing moved (compared
+#    against the UPSTREAM_SHAS asset on the Latest release).
+#
+# 2. Instant (optional, needs a one-time token): add this snippet to each
+#    upstream package repo so a push there immediately pings this repo:
+#
+#      on:
+#        push:
+#          branches: [main]
+#      jobs:
+#        notify-extras:
+#          runs-on: ubuntu-latest
+#          steps:
+#            - run: |
+#                gh api repos/RishiSpace/enigmars-extras/dispatches \
+#                  -f event_type=upstream-push \
+#                  -f client_payload[repo]="${{ github.repository }}" \
+#                  -f client_payload[sha]="${{ github.sha }}"
+#              env:
+#                GH_TOKEN: ${{ secrets.EXTRAS_DISPATCH_TOKEN }}
+#
+#    where EXTRAS_DISPATCH_TOKEN is a fine-grained PAT (Repository access:
+#    RishiSpace/enigmars-extras, permission: Contents read+write, or
+#    Actions read+write) stored as a secret in the upstream repo.
 name: extras-repo
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if upstream SHAs are unchanged"
+        required: false
+        default: "false"
+  schedule:
+    # Hourly poll of upstream package repos (minute 17 avoids hourly spikes).
+    - cron: "17 * * * *"
+  repository_dispatch:
+    types: [upstream-push, upstream-sync]
 
 concurrency:
   group: extras-repo-${{ github.ref }}
@@ -22,7 +62,83 @@ jobs:
       - name: Checkout extras
         uses: actions/checkout@v4
 
+      - name: Resolve upstream SHAs
+        id: resolve
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          shopt -s nullglob
+          confs=(packages.d/*.conf)
+          ((${#confs[@]})) || { echo "no packages.d/*.conf files" >&2; exit 1; }
+          for conf in "${confs[@]}"; do
+            # Source the conf to honour NAME=/GIT= exactly (no grep hacks).
+            git_url="$(bash -c 'source "$1"; printf "%s" "${GIT:-}"' _ "$conf")"
+            name="$(bash -c 'source "$1"; printf "%s" "${NAME:-}"' _ "$conf")"
+            [[ -n "$git_url" ]] || { echo "GIT missing in $conf" >&2; exit 1; }
+            [[ -n "$name" ]] || name="$(basename "$conf" .conf)"
+            sha="$(git ls-remote "$git_url" HEAD | awk '{print $1}')"
+            [[ -n "$sha" ]] || { echo "failed to resolve $git_url" >&2; exit 1; }
+            echo "$name $sha $git_url" >> "$tmp"
+          done
+          sort -o "$tmp" "$tmp"
+          cat "$tmp"
+          cp "$tmp" /tmp/current-shas.txt
+          {
+            echo "shas<<EOF"
+            cat "$tmp"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Decide if rebuild is needed
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_INPUT: ${{ inputs.force }}
+          PAYLOAD_REPO: ${{ github.event.client_payload.repo }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${PAYLOAD_REPO:-}" ]]; then
+            echo "Triggered by upstream push: $PAYLOAD_REPO @ ${PAYLOAD_SHA:-unknown}"
+          fi
+          # Pushes to this repo, manual runs, and explicit upstream pings
+          # always rebuild. Only scheduled polls may skip when unchanged.
+          if [[ "$EVENT_NAME" != "schedule" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            if [[ "$FORCE_INPUT" == "true" ]]; then
+              echo "Manual run with force=true."
+            else
+              echo "Event $EVENT_NAME always rebuilds."
+            fi
+            exit 0
+          fi
+          if [[ "$FORCE_INPUT" == "true" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "Scheduled run with force=true."
+            exit 0
+          fi
+          mkdir -p /tmp/prev-shas
+          if gh release download \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "UPSTREAM_SHAS" \
+            --dir /tmp/prev-shas \
+            --clobber 2>/dev/null; then
+            if diff -q /tmp/current-shas.txt /tmp/prev-shas/UPSTREAM_SHAS >/dev/null; then
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              echo "Upstream SHAs unchanged; skipping rebuild."
+            else
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+              echo "Upstream moved:"
+              diff -u /tmp/prev-shas/UPSTREAM_SHAS /tmp/current-shas.txt || true
+            fi
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "No previous UPSTREAM_SHAS on Latest release; building."
+          fi
+
       - name: Build packages in Arch
+        if: steps.decide.outputs.should_build == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -41,8 +157,15 @@ jobs:
               su -s /bin/bash builder -c "./scripts/build-all.sh"
             '
 
+      - name: Record upstream SHAs
+        if: steps.decide.outputs.should_build == 'true'
+        run: |
+          set -euo pipefail
+          cp /tmp/current-shas.txt repo/x86_64/UPSTREAM_SHAS
+          cat repo/x86_64/UPSTREAM_SHAS
+
       - name: Publish Latest release
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: steps.decide.outputs.should_build == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
