@@ -1,5 +1,5 @@
 # Publish packages.d/* onto GitHub Latest so pacman can use:
-#   Server = https://github.com/RishiSpace/enigmars-extras/releases/latest/download
+#   Server = https://github.com/enigmars-project/enigmars-extras/releases/latest/download
 # Ubuntu runners have no makepkg/repo-add; the Arch container does.
 #
 # How this stays up to date with the individual package repos
@@ -21,7 +21,7 @@
 #          runs-on: ubuntu-latest
 #          steps:
 #            - run: |
-#                gh api repos/RishiSpace/enigmars-extras/dispatches \
+#                gh api repos/enigmars-project/enigmars-extras/dispatches \
 #                  -f event_type=upstream-push \
 #                  -f client_payload[repo]="${{ github.repository }}" \
 #                  -f client_payload[sha]="${{ github.sha }}"
@@ -29,7 +29,7 @@
 #                GH_TOKEN: ${{ secrets.EXTRAS_DISPATCH_TOKEN }}
 #
 #    where EXTRAS_DISPATCH_TOKEN is a fine-grained PAT (Repository access:
-#    RishiSpace/enigmars-extras, permission: Contents read+write, or
+#    enigmars-project/enigmars-extras, permission: Contents read+write, or
 #    Actions read+write) stored as a secret in the upstream repo.
 name: extras-repo
 

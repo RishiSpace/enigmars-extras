@@ -17,7 +17,7 @@ repo_root() {
 REPO_ROOT="$(repo_root)"
 REPO_DIR="${ENIGMARS_EXTRAS_REPO_DIR:-$REPO_ROOT/repo/x86_64}"
 PACKAGES_D="$REPO_ROOT/packages.d"
-GITHUB_REPO="${ENIGMARS_EXTRAS_GITHUB:-RishiSpace/enigmars-extras}"
+GITHUB_REPO="${ENIGMARS_EXTRAS_GITHUB:-enigmars-project/enigmars-extras}"
 DB_NAME="enigmars-extras"
 
 die() {

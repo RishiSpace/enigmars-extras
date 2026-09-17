@@ -9,5 +9,5 @@ Pacman only GETs:
 - then the `.pkg.tar.zst` files named in that database
 
 ```text
-https://github.com/RishiSpace/enigmars-extras/releases/latest/download/<filename>
+https://github.com/enigmars-project/enigmars-extras/releases/latest/download/<filename>
 ```

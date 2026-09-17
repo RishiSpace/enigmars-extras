@@ -1,7 +1,7 @@
 # enigmars-extras
 
 Pacman repo for Enigmars userspace packages. The kernel stays in
-[linux-enigmarsos](https://github.com/RishiSpace/linux-enigmarsos).
+[linux-enigmarsos](https://github.com/enigmars-project/linux-enigmarsos).
 
 Each program stays in its own git. This repo only builds Arch packages
 from those checkouts and publishes a pacman database.
@@ -9,7 +9,7 @@ from those checkouts and publishes a pacman database.
 ```ini
 [enigmars-extras]
 SigLevel = Optional TrustAll
-Server = https://github.com/RishiSpace/enigmars-extras/releases/latest/download
+Server = https://github.com/enigmars-project/enigmars-extras/releases/latest/download
 ```
 
 ```bash
